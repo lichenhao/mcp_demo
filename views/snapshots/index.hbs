@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --accent: #6366f1;
+        --border: #e2e8f0;
+        --bg: #f8fafc;
+        --panel: #ffffff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif;
+        background: var(--bg);
+        color: #0f172a;
+      }
+      header {
+        padding: 1.5rem 2rem 0.5rem;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      main {
+        padding: 0 2rem 2rem;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      li {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .title {
+        font-weight: 600;
+        color: #111827;
+      }
+      .meta {
+        font-size: 0.85rem;
+        color: #94a3b8;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .actions a {
+        text-decoration: none;
+        padding: 0.4rem 0.9rem;
+        border-radius: 999px;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+      }
+      .actions a:first-child {
+        background: var(--accent);
+        color: white;
+      }
+      .empty {
+        padding: 2rem;
+        text-align: center;
+        color: #94a3b8;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>{{title}}</h1>
+      <p>共 {{total}} 篇，点击即可预览或下载。</p>
+    </header>
+    <main>
+      {{#if hasSnapshots}}
+        <ul>
+          {{#each snapshots}}
+            <li>
+              <div>
+                <div class="title">{{fileName}}</div>
+                <div class="meta">更新：{{updatedAtDisplay}} · {{sizeDisplay}}</div>
+              </div>
+              <div class="actions">
+                <a href="/snapshots/{{encodedName}}/preview">预览</a>
+                <a href="/snapshots/{{encodedName}}/raw" download>下载</a>
+              </div>
+            </li>
+          {{/each}}
+        </ul>
+      {{else}}
+        <p class="empty">暂无快照，先调用 /scrape/blog 抓取一篇吧。</p>
+      {{/if}}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "name": "social-snapshot-service",
+  "version": "0.1.0",
+  "description": "NestJS service for capturing social media blog snapshots and caching video content via Puppeteer",
+  "main": "dist/main.js",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.10.0",
+    "pnpm": ">=10.18.3",
+    "python": ">=3.10.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "start:dev": "ts-node --project tsconfig.json src/main.ts",
+    "std": "ts-node --project tsconfig.json src/std-runner.ts",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.4.4",
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/platform-express": "^10.3.0",
+    "hbs": "^4.2.0",
+    "jsdom": "^24.0.0",
+    "marked": "^12.0.2",
+    "puppeteer": "^22.6.5",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-anonymize-ua": "^2.4.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.1",
+    "semver": "^7.7.3",
+    "turndown": "^7.1.2",
+    "yt-dlp-wrap": "^2.3.12"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.3.2",
+    "@nestjs/schematics": "^10.1.1",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.26",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.4.2"
+  }
+}

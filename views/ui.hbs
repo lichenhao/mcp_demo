@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>内容抓取与缓存控制台</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #0f1117;
+        color: #f4f6fb;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: clamp(1.25rem, 4vw, 2.5rem);
+        background: radial-gradient(circle at top, rgba(88, 120, 255, 0.16), transparent 55%),
+          radial-gradient(circle at 20% 20%, rgba(255, 99, 132, 0.12), transparent 45%), #0f1117;
+        min-height: 100vh;
+      }
+      .panel {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: clamp(1.5rem, 3vw, 2.5rem);
+        backdrop-filter: blur(16px);
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(12, 14, 21, 0.78);
+        box-shadow: 0 25px 80px rgba(8, 10, 18, 0.6);
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        letter-spacing: 0.04em;
+      }
+      p.subtitle {
+        margin: 0.75rem 0 0;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      form {
+        margin-top: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      label {
+        font-size: 0.92rem;
+        color: rgba(247, 248, 250, 0.85);
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+        padding: 0.7rem 0.9rem;
+        color: inherit;
+        font-size: 0.95rem;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: 2px solid rgba(126, 138, 255, 0.45);
+        border-color: rgba(126, 138, 255, 0.7);
+      }
+      .grid {
+        display: grid;
+        gap: 1rem;
+      }
+      .grid.two {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+      .card {
+        padding: 1rem 1.25rem;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .card header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .switch input {
+        width: auto;
+      }
+      button {
+        border: none;
+        padding: 0.9rem 1.5rem;
+        border-radius: 999px;
+        background: linear-gradient(120deg, #6671ff, #8f5aff, #ff8f70);
+        color: white;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: transform 120ms ease, box-shadow 120ms ease;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      button:not(:disabled):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 18px 40px rgba(130, 104, 255, 0.35);
+      }
+      .status {
+        min-height: 1.75rem;
+        font-size: 0.88rem;
+      }
+      .pill {
+        display: inline-flex;
+        gap: 0.4rem;
+        align-items: center;
+        padding: 0.25rem 0.85rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .pill-success {
+        background: rgba(38, 192, 140, 0.15);
+        color: #26c08c;
+      }
+      .pill-error {
+        background: rgba(255, 86, 86, 0.15);
+        color: #ff5656;
+      }
+      .pill-info {
+        background: rgba(126, 138, 255, 0.15);
+        color: #8f9bff;
+      }
+      .result {
+        margin-top: 2rem;
+        padding: 1.4rem;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(18, 22, 33, 0.92);
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+        font-size: 0.9rem;
+        max-height: 460px;
+        overflow: auto;
+      }
+      .footer {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.55);
+      }
+      [data-section] {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      [data-section][hidden] {
+        display: none;
+      }
+      .badge-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="panel">
+      <header>
+        <h1>内容抓取与缓存控制台</h1>
+        <p class="subtitle">只需输入 URL，其余参数可自动识别，也支持下拉/勾选快速自定义。</p>
+      </header>
+      <form id="scrapeForm">
+        <div class="grid two">
+          <label>
+            抓取目标 URL
+            <input name="url" type="url" placeholder="https://example.com/post" required />
+          </label>
+          <label>
+            内容类型
+            <select name="mode" id="modeSelect">
+              {{#each modeOptions}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+              {{/each}}
+            </select>
+          </label>
+        </div>
+        <div class="badge-row">
+          <span id="autoBadge" class="pill pill-info">等待输入...</span>
+          <small>自动识别可覆盖：YouTube / 哔哩哔哩 / 优酷 / 爱奇艺 / Vimeo 等视频域名</small>
+        </div>
+        <section class="card">
+          <header>
+            <span>文章抓取选项</span>
+            <label class="switch">
+              <input type="checkbox" id="blogOptionsToggle" />
+              <span>启用自定义</span>
+            </label>
+          </header>
+          <div data-section="blog-options" hidden>
+            <div class="grid two">
+              <label>
+                文件名前缀
+                <input name="snapshotName" type="text" placeholder="默认使用文章标题" />
+              </label>
+              <label>
+                等待元素
+                <select name="waitForSelectorPreset" id="waitSelector">
+                  {{#each waitForSelectorOptions}}
+                    <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                  {{/each}}
+                </select>
+              </label>
+            </div>
+            <label id="customSelector" hidden>
+              自定义选择器
+              <input name="waitForSelectorCustom" type="text" placeholder="支持 CSS 选择器" />
+            </label>
+            <div class="grid two">
+              <label>
+                视口预设
+                <select name="viewportPreset" id="viewportPreset">
+                  {{#each viewportPresets}}
+                    <option value="{{id}}" data-width="{{width}}" data-height="{{height}}" {{#if default}}selected{{/if}}>
+                      {{label}}
+                    </option>
+                  {{/each}}
+                </select>
+              </label>
+              <div class="grid two">
+                <label>
+                  宽度 (px)
+                  <input name="viewportWidth" type="number" min="320" max="2560" />
+                </label>
+                <label>
+                  高度 (px)
+                  <input name="viewportHeight" type="number" min="320" max="2560" />
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="card">
+          <header>
+            <span>视频缓存选项</span>
+            <label class="switch">
+              <input type="checkbox" id="videoOptionsToggle" />
+              <span>启用自定义</span>
+            </label>
+          </header>
+          <div data-section="video-options" hidden>
+            <div class="grid two">
+              <label>
+                下载器
+                <select name="downloader">
+                  {{#each videoDownloaders}}
+                    <option value="{{value}}" {{#if default}}selected{{/if}}>{{label}}</option>
+                  {{/each}}
+                </select>
+              </label>
+              <label>
+                音视频格式
+                <select name="format">
+                  {{#each videoFormats}}
+                    <option value="{{value}}" {{#if default}}selected{{/if}}>{{label}}</option>
+                  {{/each}}
+                </select>
+              </label>
+            </div>
+            <label>
+              输出模版
+              <select name="outputTemplate">
+                {{#each videoOutputTemplates}}
+                  <option value="{{value}}" {{#if default}}selected{{/if}}>{{label}}</option>
+                {{/each}}
+              </select>
+            </label>
+          </div>
+        </section>
+        <button type="submit">开始抓取 / 缓存</button>
+        <div id="status" class="status"></div>
+      </form>
+      <section>
+        <h2>响应结果</h2>
+        <pre id="result" class="result">待执行任务...</pre>
+      </section>
+      <footer class="footer">
+        ⚡ Social Snapshot Service · 默认输出 storage/snapshots · 视频缓存 storage/videos
+      </footer>
+    </main>
+    <script>
+      window.__UI_CONFIG__ = {{{uiConfigJson}}};
+    </script>
+    <script>
+      const form = document.getElementById('scrapeForm');
+      const status = document.getElementById('status');
+      const result = document.getElementById('result');
+      const autoBadge = document.getElementById('autoBadge');
+      const modeSelect = document.getElementById('modeSelect');
+      const blogToggle = document.getElementById('blogOptionsToggle');
+      const videoToggle = document.getElementById('videoOptionsToggle');
+      const blogSection = document.querySelector('[data-section="blog-options"]');
+      const videoSection = document.querySelector('[data-section="video-options"]');
+      const viewportPreset = document.getElementById('viewportPreset');
+      const waitSelector = document.getElementById('waitSelector');
+      const customSelector = document.getElementById('customSelector');
+      const urlInput = form.querySelector('input[name="url"]');
+
+      const config = window.__UI_CONFIG__ || { videoHostPattern: '' };
+      const videoRegex = new RegExp(config.videoHostPattern, 'i');
+
+      const setStatus = (text, type = 'info') => {
+        if (!text) {
+          status.innerHTML = '';
+          return;
+        }
+        const pillClass = type === 'success' ? 'pill-success' : type === 'error' ? 'pill-error' : 'pill-info';
+        status.innerHTML = `<span class="pill ${pillClass}">${text}</span>`;
+      };
+
+      const toggleSection = (checkbox, section) => {
+        section.hidden = !checkbox.checked;
+      };
+
+      blogToggle.addEventListener('change', () => toggleSection(blogToggle, blogSection));
+      videoToggle.addEventListener('change', () => toggleSection(videoToggle, videoSection));
+
+      const syncViewportInputs = () => {
+        const option = viewportPreset.selectedOptions[0];
+        if (!option) return;
+        const widthInput = form.querySelector('input[name="viewportWidth"]');
+        const heightInput = form.querySelector('input[name="viewportHeight"]');
+        if (option.value === 'custom') {
+          widthInput.value = '';
+          heightInput.value = '';
+          widthInput.readOnly = false;
+          heightInput.readOnly = false;
+          return;
+        }
+        const width = option.dataset.width;
+        const height = option.dataset.height;
+        widthInput.value = width || '';
+        heightInput.value = height || '';
+        widthInput.readOnly = true;
+        heightInput.readOnly = true;
+      };
+      viewportPreset.addEventListener('change', syncViewportInputs);
+      syncViewportInputs();
+
+      waitSelector.addEventListener('change', () => {
+        customSelector.hidden = waitSelector.value !== '__custom__';
+      });
+
+      const detectMode = (url) => {
+        if (!url) {
+          autoBadge.textContent = '等待输入...';
+          return 'blog';
+        }
+        const isVideo = videoRegex.test(url);
+        autoBadge.textContent = isVideo ? '检测到视频链接' : '检测到文章链接';
+        autoBadge.className = `pill ${isVideo ? 'pill-success' : 'pill-info'}`;
+        return isVideo ? 'video' : 'blog';
+      };
+
+      urlInput.addEventListener('input', () => {
+        if (modeSelect.value === 'auto') {
+          detectMode(urlInput.value.trim());
+        }
+      });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        const url = urlInput.value.trim();
+        if (!url) {
+          setStatus('请输入抓取目标 URL', 'error');
+          return;
+        }
+
+        const chosenMode = formData.get('mode') || 'auto';
+        const detectedMode = detectMode(url);
+        const mode = chosenMode === 'auto' ? detectedMode : chosenMode;
+
+        const blogPayload = { url };
+        if (blogToggle.checked) {
+          const snapshotName = formData.get('snapshotName');
+          if (snapshotName) blogPayload.snapshotName = snapshotName;
+          const selectorPreset = formData.get('waitForSelectorPreset');
+          if (selectorPreset === '__custom__') {
+            const customValue = formData.get('waitForSelectorCustom');
+            if (customValue) blogPayload.waitForSelector = customValue;
+          } else if (selectorPreset) {
+            blogPayload.waitForSelector = selectorPreset;
+          }
+          if (viewportPreset.value) {
+            const width = Number(formData.get('viewportWidth'));
+            const height = Number(formData.get('viewportHeight'));
+            if (width && height) {
+              blogPayload.viewport = { width, height };
+            }
+          }
+        }
+
+        const videoPayload = { url };
+        if (videoToggle.checked) {
+          const downloader = formData.get('downloader');
+          const format = formData.get('format');
+          const outputTemplate = formData.get('outputTemplate');
+          if (downloader) videoPayload.downloader = downloader;
+          if (format) videoPayload.format = format;
+          if (outputTemplate) videoPayload.outputTemplate = outputTemplate;
+        }
+
+        const endpoint = mode === 'video' ? '/scrape/video' : '/scrape/blog';
+        const payload = mode === 'video' ? videoPayload : blogPayload;
+
+        setStatus('任务执行中...', 'info');
+        form.querySelector('button').disabled = true;
+        result.textContent = '🚧 正在抓取，请稍候...';
+
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const body = await response.json();
+          if (!response.ok) {
+            throw new Error(body.message || '抓取失败');
+          }
+          setStatus('任务完成', 'success');
+          result.textContent = JSON.stringify(body, null, 2);
+        } catch (error) {
+          console.error(error);
+          setStatus(error.message || '请求失败', 'error');
+          result.textContent = error.stack || error.message;
+        } finally {
+          form.querySelector('button').disabled = false;
+          urlInput.value = url;
+        }
+      });
+    </script>
+  </body>
+</html>

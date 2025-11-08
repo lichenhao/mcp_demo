@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{fileName}} - Snapshot Preview</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --accent: #4f46e5;
+        --accent-muted: rgba(79, 70, 229, 0.15);
+        --bg: #f8fafc;
+        --panel-bg: #ffffff;
+        --border: #e2e8f0;
+        --error: #f87171;
+        --info: #38bdf8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif;
+        background: var(--bg);
+        color: #0f172a;
+      }
+      header {
+        padding: 1rem 2rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--panel-bg);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      header h1 {
+        font-size: 1.1rem;
+        margin: 0;
+        font-weight: 600;
+      }
+      header .actions {
+        display: flex;
+        gap: 0.75rem;
+      }
+      header a {
+        text-decoration: none;
+        color: white;
+        background: var(--accent);
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 3fr 1.1fr;
+        gap: 1.5rem;
+        padding: 1.5rem 2rem;
+      }
+      @media (max-width: 1200px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+      .snapshot-content {
+        padding: 2rem;
+        background: var(--panel-bg);
+        border-radius: 1rem;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        line-height: 1.7;
+        font-size: 1rem;
+      }
+      .snapshot-content pre {
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        overflow-x: auto;
+      }
+      .annotations-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .panel {
+        background: var(--panel-bg);
+        border-radius: 1rem;
+        padding: 1rem 1.5rem;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+      .panel h2 {
+        margin-top: 0;
+        font-size: 1rem;
+      }
+      .notification {
+        display: none;
+        margin-bottom: 0.75rem;
+        padding: 0.6rem 0.9rem;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+      }
+      .notification[data-type='error'] {
+        background: rgba(248, 113, 113, 0.15);
+        color: var(--error);
+      }
+      .notification[data-type='info'] {
+        background: rgba(56, 189, 248, 0.15);
+        color: var(--info);
+      }
+      .annotation-highlight {
+        background: var(--accent-muted);
+        border-radius: 0.2rem;
+        padding: 0 0.15rem;
+        cursor: pointer;
+      }
+      .sticky-viewer {
+        position: sticky;
+        top: 1rem;
+      }
+      .active-annotation-empty {
+        color: #94a3b8;
+        font-size: 0.9rem;
+      }
+      .annotation-comment {
+        font-weight: 500;
+        color: #0f172a;
+      }
+      .annotation-meta {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        margin-top: 0.3rem;
+      }
+      .annotation-tags {
+        margin-top: 0.4rem;
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+      }
+      .annotation-tags span {
+        font-size: 0.75rem;
+        border-radius: 999px;
+        padding: 0.15rem 0.5rem;
+        background: rgba(79, 70, 229, 0.1);
+        color: var(--accent);
+      }
+      .annotation-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        max-height: 360px;
+        overflow-y: auto;
+      }
+      .annotation-item {
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        padding: 0.75rem;
+        cursor: pointer;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+      .annotation-item:hover {
+        border-color: var(--accent);
+        transform: translateX(2px);
+      }
+      .annotation-quote {
+        font-size: 0.9rem;
+        color: #475569;
+        margin-bottom: 0.4rem;
+        border-left: 3px solid var(--accent);
+        padding-left: 0.5rem;
+      }
+      .empty-state {
+        color: #94a3b8;
+        font-size: 0.9rem;
+      }
+      /* Drawer */
+      .drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+      .drawer-backdrop.visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: min(520px, 100%);
+        height: 100%;
+        background: #ffffff;
+        box-shadow: -10px 0 30px rgba(15, 23, 42, 0.3);
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        z-index: 20;
+      }
+      .drawer.open {
+        transform: translateX(0);
+      }
+      .drawer-content {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+      }
+      .drawer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .drawer-close {
+        background: transparent;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #475569;
+      }
+      .drawer-section {
+        margin-bottom: 1rem;
+      }
+      .drawer-section label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #475569;
+      }
+      .selected-quote {
+        min-height: 60px;
+        padding: 0.75rem;
+        border: 1px dashed var(--border);
+        border-radius: 0.5rem;
+        background: #f1f5f9;
+        font-size: 0.9rem;
+      }
+      .style-options {
+        display: flex;
+        gap: 0.75rem;
+      }
+      .style-options label {
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .color-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .color-row input[type='color'] {
+        width: 46px;
+        height: 32px;
+        border: none;
+        padding: 0;
+        background: transparent;
+      }
+      .color-row select {
+        border-radius: 0.4rem;
+        border: 1px solid var(--border);
+        padding: 0.35rem 0.5rem;
+      }
+      .expertise-options {
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+      }
+      .expertise-option {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.3rem 0.65rem;
+        background: #f8fafc;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      .expertise-option.active {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(79, 70, 229, 0.1);
+      }
+      textarea {
+        width: 100%;
+        min-height: 180px;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border);
+        padding: 0.75rem;
+        font-family: 'Fira Code', 'SFMono-Regular', Consolas, monospace;
+        resize: vertical;
+      }
+      .drawer-preview {
+        min-height: 120px;
+        border-radius: 0.5rem;
+        border: 1px dashed var(--border);
+        padding: 0.85rem;
+        background: #f8fafc;
+      }
+      .drawer-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+      .drawer-actions button {
+        flex: 1;
+        border: none;
+        border-radius: 999px;
+        padding: 0.7rem 1rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .drawer-actions .primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .drawer-actions .secondary {
+        background: #e2e8f0;
+        color: #475569;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>{{fileName}}</h1>
+      <div class="actions">
+        <a href="/snapshots" title="返回列表">返回列表</a>
+        <a href="{{downloadUrl}}" download>下载 Markdown</a>
+      </div>
+    </header>
+    <main>
+      <article id="snapshot-content" class="snapshot-content">
+        {{{html}}}
+      </article>
+      <aside class="annotations-panel">
+        <section class="panel sticky-viewer" id="active-annotation-panel">
+          <h2>阅读批注</h2>
+          <div id="annotation-message" class="notification"></div>
+          <div id="active-annotation-empty" class="active-annotation-empty">
+            滑选正文中的内容即可打开批注抽屉，提交后在此实时跟随。
+          </div>
+          <div id="active-annotation-body" style="display: none">
+            <div class="annotation-quote" id="active-annotation-quote"></div>
+            <div class="annotation-comment" id="active-annotation-comment"></div>
+            <div class="annotation-tags" id="active-annotation-tags"></div>
+            <div class="annotation-meta" id="active-annotation-meta"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>全部批注</h2>
+          <p id="annotation-empty" class="empty-state" {{#if hasAnnotations}}style="display:none"{{/if}}>
+            {{#if hasAnnotations}}加载中...{{else}}还没有批注，快去圈选吧。{{/if}}
+          </p>
+          <ul id="annotation-list" class="annotation-list">
+            {{#if hasAnnotations}}
+              {{#each annotations}}
+                <li class="annotation-item" data-id="{{id}}">
+                  <div class="annotation-quote">“{{quote}}”</div>
+                  <div class="annotation-comment">{{{commentHtml}}}</div>
+                  {{#if expertise.length}}
+                    <div class="annotation-tags">
+                      {{#each expertise}}
+                        <span>{{this}}</span>
+                      {{/each}}
+                    </div>
+                  {{/if}}
+                  <div class="annotation-meta">{{createdAtDisplay}}</div>
+                </li>
+              {{/each}}
+            {{/if}}
+          </ul>
+        </section>
+      </aside>
+    </main>
+
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <div class="drawer" id="annotation-drawer" aria-hidden="true">
+      <div class="drawer-content">
+        <div class="drawer-header">
+          <div>
+            <h3>批注编辑</h3>
+            <p style="color: #94a3b8; margin: 0">使用 Markdown 编写富文本，一边阅读一边批注。</p>
+          </div>
+          <button type="button" class="drawer-close" id="drawer-close" aria-label="关闭抽屉">×</button>
+        </div>
+        <div class="drawer-section">
+          <label>选中内容</label>
+          <div id="drawer-quote" class="selected-quote">暂无选区</div>
+        </div>
+        <div class="drawer-section">
+          <label>样式</label>
+          <div class="style-options">
+            <label>
+              <input type="radio" name="drawer-style" value="highlight" checked />
+              底色高亮
+            </label>
+            <label>
+              <input type="radio" name="drawer-style" value="underline" />
+              下划线
+            </label>
+          </div>
+          <div class="color-row" style="margin-top: 0.5rem">
+            <span>颜色</span>
+            <input type="color" id="drawer-color" value="#fff3a3" />
+            <select id="drawer-underline-style">
+              <option value="solid">直线</option>
+              <option value="dashed">虚线</option>
+              <option value="dotted">点线</option>
+              <option value="wavy">波浪线</option>
+            </select>
+          </div>
+        </div>
+        <div class="drawer-section">
+          <label>擅长</label>
+          <div class="expertise-options" id="drawer-expertise-options">
+            {{#each expertiseOptions}}
+              <button type="button" class="expertise-option" data-value="{{this}}">{{this}}</button>
+            {{/each}}
+          </div>
+        </div>
+        <div class="drawer-section">
+          <label>批注内容（Markdown）</label>
+          <textarea id="drawer-markdown" placeholder="例如：**结论**：这个方法在移动端存在性能问题。"></textarea>
+        </div>
+        <div class="drawer-section">
+          <label>预览</label>
+          <div id="drawer-preview" class="drawer-preview empty-state">没有内容</div>
+        </div>
+        <div class="drawer-actions">
+          <button type="button" class="secondary" id="drawer-cancel">取消</button>
+          <button type="button" class="primary" id="drawer-save">保存批注</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/vendor/marked.min.js"></script>
+    <script id="snapshot-state" type="application/json">
+      {{{stateJson}}}
+    </script>
+    <script>
+      (() => {
+        const stateElement = document.getElementById('snapshot-state');
+        if (!stateElement) {
+          return;
+        }
+        const state = JSON.parse(stateElement.textContent || '{}');
+        const content = document.getElementById('snapshot-content');
+        const list = document.getElementById('annotation-list');
+        const empty = document.getElementById('annotation-empty');
+        const notification = document.getElementById('annotation-message');
+
+        const activeEmpty = document.getElementById('active-annotation-empty');
+        const activeBody = document.getElementById('active-annotation-body');
+        const activeQuote = document.getElementById('active-annotation-quote');
+        const activeComment = document.getElementById('active-annotation-comment');
+        const activeTags = document.getElementById('active-annotation-tags');
+        const activeMeta = document.getElementById('active-annotation-meta');
+
+        const drawer = document.getElementById('annotation-drawer');
+        const drawerBackdrop = document.getElementById('drawer-backdrop');
+        const drawerClose = document.getElementById('drawer-close');
+        const drawerCancel = document.getElementById('drawer-cancel');
+        const drawerSave = document.getElementById('drawer-save');
+        const drawerQuote = document.getElementById('drawer-quote');
+        const drawerMarkdown = document.getElementById('drawer-markdown');
+        const drawerPreview = document.getElementById('drawer-preview');
+        const drawerColor = document.getElementById('drawer-color');
+        const drawerUnderlineStyle = document.getElementById('drawer-underline-style');
+        const drawerStyleRadios = Array.from(document.querySelectorAll('input[name="drawer-style"]'));
+        const drawerExpertiseButtons = Array.from(document.querySelectorAll('#drawer-expertise-options .expertise-option'));
+
+        let pendingQuote = '';
+        let selectedExpertise = [];
+        let activeAnnotationId = null;
+        let messageTimer;
+
+        function showMessage(type, message, asHtml = false) {
+          if (!notification) {
+            return;
+          }
+          notification.dataset.type = type;
+          notification.style.display = message ? 'block' : 'none';
+          notification.innerHTML = asHtml ? message : escapeHtml(message);
+          clearTimeout(messageTimer);
+          if (message) {
+            messageTimer = window.setTimeout(() => {
+              notification.style.display = 'none';
+            }, 4000);
+          }
+        }
+
+        function escapeHtml(text) {
+          return text
+            ? text.replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+              })[char] || char)
+            : '';
+        }
+
+        function updateActiveAnnotation(annotation) {
+          if (!annotation) {
+            activeBody.style.display = 'none';
+            activeEmpty.style.display = 'block';
+            activeAnnotationId = null;
+            return;
+          }
+          activeAnnotationId = annotation.id;
+          activeEmpty.style.display = 'none';
+          activeBody.style.display = 'block';
+          activeQuote.textContent = '“' + annotation.quote + '”';
+          activeComment.innerHTML = annotation.commentHtml || escapeHtml(annotation.comment);
+          if (annotation.expertise && annotation.expertise.length) {
+            activeTags.style.display = 'flex';
+            activeTags.innerHTML = annotation.expertise.map((tag) => '<span>' + escapeHtml(tag) + '</span>').join('');
+          } else {
+            activeTags.style.display = 'none';
+            activeTags.innerHTML = '';
+          }
+          activeMeta.textContent = new Date(annotation.createdAt).toLocaleString();
+        }
+
+        function clearHighlights() {
+          document.querySelectorAll('.annotation-highlight').forEach((element) => {
+            const textNode = document.createTextNode(element.textContent || '');
+            element.replaceWith(textNode);
+          });
+        }
+
+        let highlightObserver;
+        const annotationsMap = new Map();
+
+        function ensureHighlightObserver() {
+          highlightObserver = new IntersectionObserver(
+            (entries) => {
+              const visible = entries
+                .filter((entry) => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+              if (visible.length) {
+                const id = visible[0].target.dataset.annotationId;
+                if (id && annotationsMap.has(id)) {
+                  updateActiveAnnotation(annotationsMap.get(id));
+                }
+              }
+            },
+            {
+              root: null,
+              threshold: [0.25, 0.5, 0.75],
+            },
+          );
+        }
+
+        function observeHighlightElement(element, annotationId) {
+          if (!highlightObserver) {
+            ensureHighlightObserver();
+          }
+          element.dataset.annotationId = annotationId ?? '';
+          highlightObserver.observe(element);
+        }
+
+        function applyHighlight(annotation) {
+          if (!annotation.quote) {
+            return;
+          }
+          const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            const text = node.textContent ?? '';
+            const index = text.indexOf(annotation.quote);
+            if (index === -1) {
+              continue;
+            }
+            const range = document.createRange();
+            range.setStart(node, index);
+            range.setEnd(node, index + annotation.quote.length);
+            const mark = document.createElement('mark');
+            mark.className = 'annotation-highlight';
+            const style = annotation.style || {};
+            const mode = style.mode || 'highlight';
+            const color = style.color || 'rgba(79, 70, 229, 0.2)';
+            if (mode === 'underline') {
+              mark.style.backgroundColor = 'transparent';
+              mark.style.textDecoration = 'underline';
+              mark.style.textDecorationStyle = style.underlineStyle || 'solid';
+              mark.style.textDecorationColor = color;
+              mark.style.textDecorationThickness = '2px';
+            } else {
+              mark.style.backgroundColor = color;
+            }
+            mark.title = annotation.comment;
+            mark.appendChild(range.extractContents());
+            range.insertNode(mark);
+            mark.addEventListener('click', () => {
+              updateActiveAnnotation(annotation);
+            });
+            observeHighlightElement(mark, annotation.id ?? '');
+            break;
+          }
+        }
+
+        function renderAnnotations() {
+          const annotations = state.annotations ?? [];
+          annotationsMap.clear();
+          if (highlightObserver) {
+            highlightObserver.disconnect();
+            highlightObserver = null;
+          }
+          list.innerHTML = '';
+          if (!annotations.length) {
+            empty.style.display = 'block';
+          } else {
+            empty.style.display = 'none';
+          }
+          annotations
+            .slice()
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+            .forEach((annotation) => {
+              annotationsMap.set(annotation.id ?? '', annotation);
+              const li = document.createElement('li');
+              li.className = 'annotation-item';
+              li.dataset.id = annotation.id ?? '';
+              const tags =
+                annotation.expertise && annotation.expertise.length
+                  ? '<div class="annotation-tags">' +
+                    annotation.expertise.map((tag) => '<span>' + escapeHtml(tag) + '</span>').join('') +
+                    '</div>'
+                  : '';
+              li.innerHTML = [
+                '<div class="annotation-quote">“' + escapeHtml(annotation.quote) + '”</div>',
+                '<div class="annotation-comment">' + (annotation.commentHtml || escapeHtml(annotation.comment)) + '</div>',
+                tags,
+                '<div class="annotation-meta">' + new Date(annotation.createdAt).toLocaleString() + '</div>',
+              ].join('');
+              li.addEventListener('click', () => updateActiveAnnotation(annotation));
+              list.appendChild(li);
+            });
+
+          clearHighlights();
+          annotations.forEach(applyHighlight);
+
+          if (annotations.length && !activeAnnotationId) {
+            updateActiveAnnotation(annotations[0]);
+          } else if (activeAnnotationId) {
+            const current = annotations.find((a) => a.id === activeAnnotationId);
+            updateActiveAnnotation(current ?? annotations[0]);
+          }
+        }
+
+        async function refreshAnnotations() {
+          try {
+            const response = await fetch(state.annotationsUrl);
+            const latest = await response.json();
+            state.annotations = await Promise.all(
+              latest.map(async (annotation) => ({
+                ...annotation,
+                expertise: annotation.expertise ?? [],
+                commentHtml:
+                  typeof marked !== 'undefined' ? marked.parse(annotation.comment) : annotation.comment,
+              })),
+            );
+            renderAnnotations();
+          } catch (error) {
+            showMessage('error', '批注刷新失败：' + error.message);
+          }
+        }
+
+        async function submitAnnotation(payload) {
+          await fetch(state.annotationsUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        }
+
+        function openDrawer(quote) {
+          pendingQuote = quote;
+          drawerQuote.textContent = quote;
+          drawerMarkdown.value = '';
+          drawerPreview.textContent = '没有内容';
+          drawerPreview.classList.add('empty-state');
+          drawerColor.value = '#fff3a3';
+          drawerUnderlineStyle.value = 'solid';
+          drawerStyleRadios.forEach((radio) => {
+            radio.checked = radio.value === 'highlight';
+          });
+          selectedExpertise = [];
+          drawerExpertiseButtons.forEach((button) => button.classList.remove('active'));
+          drawer.setAttribute('aria-hidden', 'false');
+          drawer.classList.add('open');
+          drawerBackdrop.classList.add('visible');
+          drawerMarkdown.focus();
+        }
+
+        function closeDrawer() {
+          drawer.setAttribute('aria-hidden', 'true');
+          drawer.classList.remove('open');
+          drawerBackdrop.classList.remove('visible');
+        }
+
+        function updateDrawerPreview() {
+          const markdown = drawerMarkdown.value.trim();
+          if (!markdown) {
+            drawerPreview.textContent = '没有内容';
+            drawerPreview.classList.add('empty-state');
+            return;
+          }
+          if (typeof marked !== 'undefined') {
+            drawerPreview.innerHTML = marked.parse(markdown);
+          } else {
+            drawerPreview.textContent = markdown;
+          }
+          drawerPreview.classList.remove('empty-state');
+        }
+
+        drawerMarkdown.addEventListener('input', updateDrawerPreview);
+
+        drawerExpertiseButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            const value = button.dataset.value || '';
+            const exists = selectedExpertise.includes(value);
+            selectedExpertise = exists
+              ? selectedExpertise.filter((item) => item !== value)
+              : [...selectedExpertise, value];
+            button.classList.toggle('active', !exists);
+          });
+        });
+
+        drawerClose.addEventListener('click', closeDrawer);
+        drawerCancel.addEventListener('click', closeDrawer);
+        drawerBackdrop.addEventListener('click', closeDrawer);
+
+        drawerSave.addEventListener('click', async () => {
+          if (!pendingQuote) {
+            showMessage('error', '请先圈选正文内容。');
+            closeDrawer();
+            return;
+          }
+          const markdown = drawerMarkdown.value.trim();
+          if (!markdown) {
+            showMessage('error', '请输入批注内容。');
+            return;
+          }
+          const selectedStyle = drawerStyleRadios.find((radio) => radio.checked);
+          const mode = selectedStyle ? selectedStyle.value : 'highlight';
+          const color = drawerColor.value;
+          const underlineStyle = drawerUnderlineStyle.value;
+          try {
+            await submitAnnotation({
+              quote: pendingQuote,
+              comment: markdown,
+              expertise: selectedExpertise,
+              style: {
+                mode,
+                color,
+                underlineStyle: mode === 'underline' ? underlineStyle : undefined,
+              },
+            });
+            closeDrawer();
+            showMessage('info', '批注已保存');
+            await refreshAnnotations();
+          } catch (error) {
+            showMessage('error', '保存失败：' + error.message);
+          }
+        });
+
+        content.addEventListener('mouseup', () => {
+          const selection = window.getSelection();
+          const quote = selection ? selection.toString().trim() : '';
+          if (!quote || quote.length < 2) {
+            return;
+          }
+          selection?.removeAllRanges();
+          showMessage('info', '正在为选中内容创建批注');
+          openDrawer(quote);
+        });
+
+        state.annotations = (state.initialAnnotations || []).map((annotation) => ({
+          ...annotation,
+          expertise: annotation.expertise ?? [],
+        }));
+        renderAnnotations();
+        refreshAnnotations();
+      })();
+    </script>
+  </body>
+</html>
